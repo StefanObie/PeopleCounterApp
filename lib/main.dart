@@ -126,15 +126,20 @@ class _PeopleCounterHomeState extends State<PeopleCounterHome> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: hasImage
-                    ? Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.file(_selectedImage!, fit: BoxFit.contain),
-                          if (_result != null)
-                            CustomPaint(
-                              painter: DetectionPainter(_result!),
-                            ),
-                        ],
+                    ? InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 5.0,
+                        // boundaryMargin: const EdgeInsets.all(20),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.file(_selectedImage!, fit: BoxFit.contain),
+                            if (_result != null)
+                              CustomPaint(
+                                painter: DetectionPainter(_result!),
+                              ),
+                          ],
+                        ),
                       )
                     : Container(
                         decoration: BoxDecoration(
