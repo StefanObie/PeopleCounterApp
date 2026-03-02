@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import 'people_counter.dart';
+import '../services/people_counter.dart';
 
 /// Draws YOLOv5 bounding boxes over the image preview.
 ///
@@ -28,7 +28,6 @@ class DetectionPainter extends CustomPainter {
   DetectionPainter(this.result);
 
   static const double _strokeWidth = 1;
-  static const double _fontSize = 12;
   static const Color _boxColour = Color.fromARGB(255, 128, 255, 0);
 
   @override
@@ -53,12 +52,9 @@ class DetectionPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (final det in result.detections) {
-      final left =
-          offsetX + (det.x1 / PeopleCounter.inputSize) * imgW * scale;
-      final top =
-          offsetY + (det.y1 / PeopleCounter.inputSize) * imgH * scale;
-      final right =
-          offsetX + (det.x2 / PeopleCounter.inputSize) * imgW * scale;
+      final left = offsetX + (det.x1 / PeopleCounter.inputSize) * imgW * scale;
+      final top = offsetY + (det.y1 / PeopleCounter.inputSize) * imgH * scale;
+      final right = offsetX + (det.x2 / PeopleCounter.inputSize) * imgW * scale;
       final bottom =
           offsetY + (det.y2 / PeopleCounter.inputSize) * imgH * scale;
 
@@ -66,42 +62,7 @@ class DetectionPainter extends CustomPainter {
 
       canvas.drawRect(rect, fillPaint);
       canvas.drawRect(rect, boxPaint);
-
-      // _drawLabel(
-      //   canvas,
-      //   label: '${(det.confidence * 100).toStringAsFixed(0)}%',
-      //   x: left,
-      //   y: top,
-      // );
     }
-  }
-
-  void _drawLabel(Canvas canvas, {required String label, required double x, required double y}) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: ' $label ',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: _fontSize,
-          fontWeight: FontWeight.bold,
-          height: 1.2,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    // Badge background
-    const padding = 2.0;
-    final bgRect = Rect.fromLTWH(
-      x - padding,
-      y - tp.height - padding * 2,
-      tp.width + padding * 2,
-      tp.height + padding * 2,
-    );
-    canvas.drawRect(bgRect, Paint()..color = _boxColour);
-
-    // Text — draw just above the top-left corner of the box
-    tp.paint(canvas, Offset(x, y - tp.height - padding));
   }
 
   @override

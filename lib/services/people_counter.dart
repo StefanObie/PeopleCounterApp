@@ -1,8 +1,9 @@
 import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
+
+import '../widgets/drawing_overlay.dart';
 
 /// Represents a single detected bounding box.
 class Detection {
@@ -87,9 +88,13 @@ class PeopleCounter {
   }
 
   /// Runs inference, returning detections and original image dimensions.
-  Future<DetectionResult> detectFromFile(File imageFile) async {
+  /// Optionally accepts [maskPaths] to exclude drawn areas from detection.
+  Future<DetectionResult> detectFromFile(
+    File imageFile, {
+    List<DrawnPath>? maskPaths,
+  }) async {
     final bytes = await imageFile.readAsBytes();
-    return _runDetections(bytes);
+    return _runDetections(bytes, maskPaths: maskPaths);
   }
 
   Future<int> _runInference(Uint8List imageBytes) async {
@@ -97,10 +102,18 @@ class PeopleCounter {
     return result.count;
   }
 
-  Future<DetectionResult> _runDetections(Uint8List imageBytes) async {
+  Future<DetectionResult> _runDetections(
+    Uint8List imageBytes, {
+    List<DrawnPath>? maskPaths,
+  }) async {
     // ── Preprocess ─────────────────────────────────────────────────────────
-    final decoded = img.decodeImage(imageBytes);
+    var decoded = img.decodeImage(imageBytes);
     if (decoded == null) throw Exception('Failed to decode image');
+
+    // Apply mask if paths are provided
+    if (maskPaths != null && maskPaths.isNotEmpty) {
+      decoded = await _applyMask(decoded, maskPaths);
+    }
 
     final resized = img.copyResize(
       decoded,
@@ -114,17 +127,10 @@ class PeopleCounter {
       1,
       (_) => List.generate(
         inputSize,
-        (y) => List.generate(
-          inputSize,
-          (x) {
-            final pixel = resized.getPixel(x, y);
-            return [
-              pixel.r / 255.0,
-              pixel.g / 255.0,
-              pixel.b / 255.0,
-            ];
-          },
-        ),
+        (y) => List.generate(inputSize, (x) {
+          final pixel = resized.getPixel(x, y);
+          return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
+        }),
       ),
     );
 
@@ -181,14 +187,16 @@ class PeopleCounter {
 
       final cx = row[0], cy = row[1], w = row[2], h = row[3];
 
-      detections.add(Detection(
-        x1: cx - w / 2,
-        y1: cy - h / 2,
-        x2: cx + w / 2,
-        y2: cy + h / 2,
-        confidence: confidence,
-        classId: bestClass,
-      ));
+      detections.add(
+        Detection(
+          x1: cx - w / 2,
+          y1: cy - h / 2,
+          x2: cx + w / 2,
+          y2: cy + h / 2,
+          confidence: confidence,
+          classId: bestClass,
+        ),
+      );
     }
 
     return detections;
@@ -228,5 +236,84 @@ class PeopleCounter {
     final bArea = (b.x2 - b.x1) * (b.y2 - b.y1);
 
     return interArea / (aArea + bArea - interArea);
+  }
+
+  /// Applies mask by painting over drawn paths with black pixels.
+  Future<img.Image> _applyMask(
+    img.Image source,
+    List<DrawnPath> paths,
+  ) async {
+    // Create a copy to avoid mutating the original
+    final masked = img.Image.from(source);
+
+    // Draw each path as a thick line on the image
+    for (final path in paths) {
+      for (int i = 0; i < path.points.length - 1; i++) {
+        final p1 = path.points[i];
+        final p2 = path.points[i + 1];
+
+        // Scale points from widget coordinates to image coordinates
+        // (This assumes paths were drawn relative to the actual image display)
+        _drawThickLine(
+          masked,
+          p1.dx.toInt(),
+          p1.dy.toInt(),
+          p2.dx.toInt(),
+          p2.dy.toInt(),
+          path.strokeWidth.toInt(),
+        );
+      }
+    }
+
+    return masked;
+  }
+
+  /// Draws a thick line on the image by painting black pixels.
+  void _drawThickLine(
+    img.Image image,
+    int x1,
+    int y1,
+    int x2,
+    int y2,
+    int thickness,
+  ) {
+    final black = img.ColorRgb8(0, 0, 0);
+    
+    // Bresenham's line algorithm with thickness
+    final dx = (x2 - x1).abs();
+    final dy = (y2 - y1).abs();
+    final sx = x1 < x2 ? 1 : -1;
+    final sy = y1 < y2 ? 1 : -1;
+    var err = dx - dy;
+
+    var x = x1;
+    var y = y1;
+
+    while (true) {
+      // Draw a circle of pixels at this point for thickness
+      for (int dy = -thickness ~/ 2; dy <= thickness ~/ 2; dy++) {
+        for (int dx = -thickness ~/ 2; dx <= thickness ~/ 2; dx++) {
+          if (dx * dx + dy * dy <= (thickness ~/ 2) * (thickness ~/ 2)) {
+            final px = x + dx;
+            final py = y + dy;
+            if (px >= 0 && px < image.width && py >= 0 && py < image.height) {
+              image.setPixel(px, py, black);
+            }
+          }
+        }
+      }
+
+      if (x == x2 && y == y2) break;
+
+      final e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+    }
   }
 }
