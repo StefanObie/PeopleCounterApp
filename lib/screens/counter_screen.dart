@@ -41,44 +41,39 @@ class CounterScreen extends StatelessWidget {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: hasImage
-                            ? Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  InteractiveViewer(
-                                    minScale: 1.0,
-                                    maxScale: 5.0,
-                                    panEnabled: !counter.drawMode,
-                                    scaleEnabled: !counter.drawMode,
-                                    child: Stack(
-                                      fit: StackFit.expand,
-                                      children: [
-                                        Image.file(
-                                          counter.selectedImage!,
-                                          fit: BoxFit.contain,
-                                        ),
-                                        if (hasResult)
-                                          CustomPaint(
-                                            painter: DetectionPainter(counter.result!),
+                            ? InteractiveViewer(
+                                minScale: 1.0,
+                                maxScale: 5.0,
+                                panEnabled: !counter.drawMode,
+                                scaleEnabled: !counter.drawMode,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.file(
+                                      counter.selectedImage!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                    if (hasResult)
+                                      CustomPaint(
+                                        painter: DetectionPainter(counter.result!),
+                                      ),
+                                    if (counter.drawMode)
+                                      DrawingOverlay(
+                                        paths: counter.drawnPaths,
+                                        strokeColor: Colors.black.withValues(alpha: 150),
+                                        strokeWidth: 20,
+                                        onPathComplete: counter.addDrawnPath,
+                                      ),
+                                    if (!counter.drawMode && counter.drawnPaths.isNotEmpty)
+                                      IgnorePointer(
+                                        child: CustomPaint(
+                                          painter: DrawingPainter(
+                                            paths: counter.drawnPaths,
                                           ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (counter.drawMode)
-                                    DrawingOverlay(
-                                      paths: counter.drawnPaths,
-                                      strokeColor: Colors.black.withValues(alpha: 150),
-                                      strokeWidth: 20,
-                                      onPathComplete: counter.addDrawnPath,
-                                    ),
-                                  if (!counter.drawMode && counter.drawnPaths.isNotEmpty)
-                                    IgnorePointer(
-                                      child: CustomPaint(
-                                        painter: DrawingPainter(
-                                          paths: counter.drawnPaths,
                                         ),
                                       ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               )
                             : Container(
                                 decoration: BoxDecoration(
