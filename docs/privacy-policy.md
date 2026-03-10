@@ -63,6 +63,4 @@ We may update this Privacy Policy from time to time. Updates will be posted in t
 
 ## Contact
 
-If you have questions about this Privacy Policy, open an issue in this repository:
-
-- https://github.com/StefanObie/PeopleCounterApp/issues
+If you have questions about this Privacy Policy, please open an issue on the [GitHub repository](https://github.com/StefanObie/PeopleCounterApp/issues).
