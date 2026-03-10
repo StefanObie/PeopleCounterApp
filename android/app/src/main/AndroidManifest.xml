@@ -5,9 +5,9 @@
     <!-- No Internet to align with privacy approach -->
 
     <application
-        android:label="people_counter"
+        android:label="People Counter"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -33,6 +33,7 @@ Future<SaveSessionRequest?> showSaveSessionSheet(
   return showModalBottomSheet<SaveSessionRequest>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     builder: (context) {
       return StatefulBuilder(
         builder: (context, setModalState) {

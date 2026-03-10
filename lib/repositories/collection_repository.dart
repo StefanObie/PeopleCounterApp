@@ -4,6 +4,7 @@ import '../database/database_helper.dart';
 import '../models/collection_summary.dart';
 import '../models/count_session.dart';
 import '../services/image_storage_service.dart';
+import '../widgets/drawing_overlay.dart';
 
 class CollectionRepository {
   CollectionRepository({DatabaseHelper? db, ImageStorageService? imageStorage})
@@ -31,6 +32,7 @@ class CollectionRepository {
     required double confidenceThreshold,
     required double iouThreshold,
     String? notes,
+    List<DrawnPath>? maskPaths,
   }) async {
     final storedImagePath = await _imageStorage.saveImageCopy(sourceImage);
 
@@ -43,6 +45,7 @@ class CollectionRepository {
       confidenceThreshold: confidenceThreshold,
       iouThreshold: iouThreshold,
       notes: notes,
+      maskPaths: maskPaths,
     );
 
     await _db.insertSession(session);
@@ -50,6 +53,10 @@ class CollectionRepository {
 
   Future<List<CountSession>> getSessionsForCollection(int collectionId) {
     return _db.getSessionsForCollection(collectionId);
+  }
+
+  Future<void> updateSession({required CountSession session}) {
+    return _db.updateSession(session);
   }
 
   Future<void> deleteCollection(int collectionId) async {

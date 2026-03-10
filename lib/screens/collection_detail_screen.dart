@@ -250,11 +250,16 @@ class _CollectionDetailScreenState extends State<CollectionDetailScreen> {
   }
 
   void _openImageInHome(BuildContext context, CountSession session) {
-    // Load the image in the counter provider and navigate to home
-    final counterProvider = context.read<CounterProvider>();
-    counterProvider.loadImageFromPath(session.imagePath);
-    
-    // Navigate back to home screen
+    context.read<CounterProvider>().loadImageFromPath(
+      session.imagePath,
+      sessionId: session.id,
+      collectionId: session.collectionId,
+      correction: session.correction,
+      notes: session.notes,
+      maskPaths: session.maskPaths,
+      confidenceThreshold: session.confidenceThreshold,
+      iouThreshold: session.iouThreshold,
+    );
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/collection_summary.dart';
 import '../models/count_session.dart';
 import '../repositories/collection_repository.dart';
+import '../widgets/drawing_overlay.dart';
 
 class CollectionProvider extends ChangeNotifier {
   CollectionProvider(this._repository) {
@@ -75,6 +76,7 @@ class CollectionProvider extends ChangeNotifier {
     required double confidenceThreshold,
     required double iouThreshold,
     String? notes,
+    List<DrawnPath>? maskPaths,
   }) async {
     try {
       await _repository.saveSessionToCollection(
@@ -85,6 +87,7 @@ class CollectionProvider extends ChangeNotifier {
         confidenceThreshold: confidenceThreshold,
         iouThreshold: iouThreshold,
         notes: notes?.trim().isEmpty == true ? null : notes?.trim(),
+        maskPaths: maskPaths,
       );
       await loadCollections();
       await loadSessions(collectionId);
@@ -105,6 +108,19 @@ class CollectionProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Failed to load sessions: $e';
       notifyListeners();
+    }
+  }
+
+  Future<bool> updateSession(CountSession session) async {
+    try {
+      await _repository.updateSession(session: session);
+      await loadCollections();
+      await loadSessions(session.collectionId);
+      return true;
+    } catch (e) {
+      _errorMessage = 'Failed to update session: $e';
+      notifyListeners();
+      return false;
     }
   }
 

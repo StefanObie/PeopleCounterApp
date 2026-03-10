@@ -8,16 +8,8 @@ import '../services/people_counter.dart';
 ///
 /// Coordinate mapping
 /// ──────────────────
-/// The model preprocessed the image by stretching it to 640×640, so every
-/// Detection stores coordinates in that 640×640 space.  The image widget
-/// uses BoxFit.contain, which letterboxes the original aspect ratio inside
-/// the available widget area.  The painter therefore applies two transforms:
-///
-///   1. Model space → original image space
-///      nx = det.x / 640,  ny = det.y / 640
-///      origX = nx * imgW, origY = ny * imgH
-///
-///   2. Original image space → widget display space  (BoxFit.contain)
+/// Detections are returned in original image coordinates. The image widget
+/// uses BoxFit.contain, so this painter only applies the display transform:
 ///      scale   = min(widgetW / imgW,  widgetH / imgH)
 ///      offsetX = (widgetW - imgW * scale) / 2
 ///      offsetY = (widgetH - imgH * scale) / 2
@@ -52,11 +44,10 @@ class DetectionPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     for (final det in result.detections) {
-      final left = offsetX + (det.x1 / PeopleCounter.inputSize) * imgW * scale;
-      final top = offsetY + (det.y1 / PeopleCounter.inputSize) * imgH * scale;
-      final right = offsetX + (det.x2 / PeopleCounter.inputSize) * imgW * scale;
-      final bottom =
-          offsetY + (det.y2 / PeopleCounter.inputSize) * imgH * scale;
+      final left = offsetX + det.x1 * scale;
+      final top = offsetY + det.y1 * scale;
+      final right = offsetX + det.x2 * scale;
+      final bottom = offsetY + det.y2 * scale;
 
       final rect = Rect.fromLTRB(left, top, right, bottom);
 

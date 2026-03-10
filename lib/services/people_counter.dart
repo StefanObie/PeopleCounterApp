@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -41,6 +42,21 @@ class DetectionResult {
   });
 
   int get count => detections.length;
+}
+
+/// Metadata produced during letterbox preprocessing.
+class _LetterboxResult {
+  final img.Image image;
+  final double scale;
+  final double padX;
+  final double padY;
+
+  const _LetterboxResult({
+    required this.image,
+    required this.scale,
+    required this.padX,
+    required this.padY,
+  });
 }
 
 /// Runs YOLOv5 TFLite inference and returns a people count.
@@ -107,20 +123,32 @@ class PeopleCounter {
     List<DrawnPath>? maskPaths,
   }) async {
     // ── Preprocess ─────────────────────────────────────────────────────────
-    var decoded = img.decodeImage(imageBytes);
+    final decoded = img.decodeImage(imageBytes);
     if (decoded == null) throw Exception('Failed to decode image');
 
-    // Apply mask if paths are provided
-    if (maskPaths != null && maskPaths.isNotEmpty) {
-      decoded = await _applyMask(decoded, maskPaths);
-    }
+    // Letterbox first — much faster to apply mask on 640×640 than on full-res.
+    final letterboxed = _letterbox(decoded);
+    var letterboxedImage = letterboxed.image;
 
-    final resized = img.copyResize(
-      decoded,
-      width: inputSize,
-      height: inputSize,
-      interpolation: img.Interpolation.linear,
-    );
+    // Apply mask on the 640×640 letterboxed image for performance.
+    // Paths are in original image coords; transform to letterboxed space.
+    if (maskPaths != null && maskPaths.isNotEmpty) {
+      final transformedPaths = maskPaths.map((path) {
+        return DrawnPath(
+          points: path.points
+              .map(
+                (p) => Offset(
+                  p.dx * letterboxed.scale + letterboxed.padX,
+                  p.dy * letterboxed.scale + letterboxed.padY,
+                ),
+              )
+              .toList(),
+          color: path.color,
+          strokeWidth: path.strokeWidth * letterboxed.scale,
+        );
+      }).toList();
+      letterboxedImage = await _applyMask(letterboxedImage, transformedPaths);
+    }
 
     // Build [1, 640, 640, 3] float32 tensor, normalised to [0, 1].
     final inputTensor = List.generate(
@@ -128,7 +156,7 @@ class PeopleCounter {
       (_) => List.generate(
         inputSize,
         (y) => List.generate(inputSize, (x) {
-          final pixel = resized.getPixel(x, y);
+          final pixel = letterboxedImage.getPixel(x, y);
           return [pixel.r / 255.0, pixel.g / 255.0, pixel.b / 255.0];
         }),
       ),
@@ -148,14 +176,81 @@ class PeopleCounter {
     // ── Post-process ────────────────────────────────────────────────────────
     final detections = _parseDetections(output[0]);
     final kept = _applyNMS(detections);
+    final mapped = kept
+        .map(
+          (d) => _mapDetectionToOriginal(
+            d,
+            imageWidth: decoded.width.toDouble(),
+            imageHeight: decoded.height.toDouble(),
+            scale: letterboxed.scale,
+            padX: letterboxed.padX,
+            padY: letterboxed.padY,
+          ),
+        )
+        .whereType<Detection>()
+        .toList();
 
     print('[PeopleCounter] Raw candidates : ${detections.length}');
     print('[PeopleCounter] After NMS      : ${kept.length}');
+    print('[PeopleCounter] After unpad    : ${mapped.length}');
 
     return DetectionResult(
-      detections: kept,
+      detections: mapped,
       imageWidth: decoded.width,
       imageHeight: decoded.height,
+    );
+  }
+
+  _LetterboxResult _letterbox(img.Image source) {
+    final scale = min(inputSize / source.width, inputSize / source.height);
+
+    final resizedWidth = (source.width * scale).round();
+    final resizedHeight = (source.height * scale).round();
+
+    final resized = img.copyResize(
+      source,
+      width: resizedWidth,
+      height: resizedHeight,
+      interpolation: img.Interpolation.linear,
+    );
+
+    final padX = ((inputSize - resizedWidth) ~/ 2).toDouble();
+    final padY = ((inputSize - resizedHeight) ~/ 2).toDouble();
+
+    final canvas = img.Image(width: inputSize, height: inputSize);
+    img.fill(canvas, color: img.ColorRgb8(114, 114, 114));
+    img.compositeImage(canvas, resized, dstX: padX.toInt(), dstY: padY.toInt());
+
+    return _LetterboxResult(
+      image: canvas,
+      scale: scale,
+      padX: padX,
+      padY: padY,
+    );
+  }
+
+  Detection? _mapDetectionToOriginal(
+    Detection det, {
+    required double imageWidth,
+    required double imageHeight,
+    required double scale,
+    required double padX,
+    required double padY,
+  }) {
+    final x1 = ((det.x1 - padX) / scale).clamp(0.0, imageWidth);
+    final y1 = ((det.y1 - padY) / scale).clamp(0.0, imageHeight);
+    final x2 = ((det.x2 - padX) / scale).clamp(0.0, imageWidth);
+    final y2 = ((det.y2 - padY) / scale).clamp(0.0, imageHeight);
+
+    if (x2 <= x1 || y2 <= y1) return null;
+
+    return Detection(
+      x1: x1,
+      y1: y1,
+      x2: x2,
+      y2: y2,
+      confidence: det.confidence,
+      classId: det.classId,
     );
   }
 

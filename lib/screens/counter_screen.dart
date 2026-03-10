@@ -6,10 +6,40 @@ import '../widgets/detection_painter.dart';
 import '../widgets/drawing_overlay.dart';
 import '../providers/collection_provider.dart';
 import '../providers/counter_provider.dart';
+import '../models/count_session.dart';
 import '../widgets/save_session_sheet.dart';
 
 class CounterScreen extends StatelessWidget {
   const CounterScreen({super.key});
+
+  Future<void> _confirmClearImage(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear Selected Image'),
+        content: const Text(
+          'Remove the selected image, all drawn masks, and the current detection result? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    context.read<CounterProvider>().clearImage();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +47,8 @@ class CounterScreen extends StatelessWidget {
     final counter = context.watch<CounterProvider>();
     final hasImage = counter.selectedImage != null;
     final hasResult = counter.result != null;
+    final hasImageDimensions =
+        counter.imageWidth != null && counter.imageHeight != null;
 
     return Stack(
       children: [
@@ -26,149 +58,157 @@ class CounterScreen extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    // Store the display size for coordinate transformation
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      counter.setImageDisplaySize(
-                        Size(constraints.maxWidth, constraints.maxHeight),
-                      );
-                    });
-
-                    return Stack(
+                child: Stack(
                   children: [
                     Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: hasImage
-                            ? InteractiveViewer(
-                                minScale: 1.0,
-                                maxScale: 5.0,
-                                panEnabled: !counter.drawMode,
-                                scaleEnabled: !counter.drawMode,
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Image.file(
-                                      counter.selectedImage!,
-                                      fit: BoxFit.contain,
-                                    ),
-                                    if (hasResult)
-                                      CustomPaint(
-                                        painter: DetectionPainter(counter.result!),
-                                      ),
-                                    if (counter.drawMode)
-                                      DrawingOverlay(
-                                        paths: counter.drawnPaths,
-                                        strokeColor: Colors.black.withValues(alpha: 150),
-                                        strokeWidth: 20,
-                                        onPathComplete: counter.addDrawnPath,
-                                      ),
-                                    if (!counter.drawMode && counter.drawnPaths.isNotEmpty)
-                                      IgnorePointer(
-                                        child: CustomPaint(
-                                          painter: DrawingPainter(
-                                            paths: counter.drawnPaths,
-                                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: hasImage
+                                ? InteractiveViewer(
+                                    minScale: 1.0,
+                                    maxScale: 5.0,
+                                    panEnabled: !counter.drawMode,
+                                    scaleEnabled: !counter.drawMode,
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        Image.file(
+                                          counter.selectedImage!,
+                                          fit: BoxFit.contain,
                                         ),
+                                        if (hasResult)
+                                          CustomPaint(
+                                            painter: DetectionPainter(counter.result!),
+                                          ),
+                                        if (counter.drawMode && hasImageDimensions)
+                                          DrawingOverlay(
+                                            paths: counter.drawnPaths,
+                                            strokeColor: Colors.black.withValues(alpha: 150),
+                                            strokeWidth: 20,
+                                            onPathComplete: counter.addDrawnPath,
+                                            imageWidth: counter.imageWidth!.toDouble(),
+                                            imageHeight: counter.imageHeight!.toDouble(),
+                                          ),
+                                        if (!counter.drawMode &&
+                                            hasImageDimensions &&
+                                            counter.drawnPaths.isNotEmpty)
+                                          IgnorePointer(
+                                            child: CustomPaint(
+                                              painter: DrawingPainter(
+                                                paths: counter.drawnPaths,
+                                                imageWidth: counter.imageWidth!.toDouble(),
+                                                imageHeight: counter.imageHeight!.toDouble(),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  )
+                                : Container(
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.photo_library_outlined, size: 64),
+                                          SizedBox(height: 12),
+                                          Text('Select an image to count people'),
+                                        ],
                                       ),
-                                  ],
-                                ),
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.photo_library_outlined, size: 64),
-                                      SizedBox(height: 12),
-                                      Text('Select an image to count people'),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              ),
-                      ),
-                    ),
-                    if (!hasImage)
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FloatingActionButton.small(
-                              onPressed: counter.isRunning
-                                  ? null
-                                  : () => counter.pickImage(ImageSource.camera),
-                              heroTag: 'camera',
-                              child: const Icon(Icons.camera_alt),
-                            ),
-                            const SizedBox(height: 8),
-                            FloatingActionButton.small(
-                              onPressed: counter.isRunning
-                                  ? null
-                                  : () => counter.pickImage(ImageSource.gallery),
-                              heroTag: 'gallery',
-                              child: const Icon(Icons.photo_library),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    if (hasImage)
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FloatingActionButton.small(
-                              onPressed: counter.isRunning ? null : counter.clearImage,
+                        if (!hasImage)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FloatingActionButton.small(
+                                  onPressed: counter.isRunning
+                                      ? null
+                                      : () => counter.pickImage(ImageSource.camera),
+                                  heroTag: 'camera',
+                                  child: const Icon(Icons.camera_alt),
+                                ),
+                                const SizedBox(height: 8),
+                                FloatingActionButton.small(
+                                  onPressed: counter.isRunning
+                                      ? null
+                                      : () => counter.pickImage(ImageSource.gallery),
+                                  heroTag: 'gallery',
+                                  child: const Icon(Icons.photo_library),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (hasImage && !counter.drawMode)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: FloatingActionButton.small(
+                              onPressed: counter.isRunning
+                                  ? null
+                                  : () => _confirmClearImage(context),
                               heroTag: 'clear',
+                              tooltip: 'Discard selected image',
                               backgroundColor: theme.colorScheme.errorContainer,
                               foregroundColor: theme.colorScheme.onErrorContainer,
                               child: const Icon(Icons.close),
                             ),
-                            const SizedBox(height: 8),
-                            FloatingActionButton.small(
-                              onPressed: counter.isRunning ? null : counter.toggleDrawMode,
-                              heroTag: 'draw',
-                              backgroundColor: counter.drawMode
-                                  ? theme.colorScheme.primaryContainer
-                                  : theme.colorScheme.surfaceContainerHighest,
-                              foregroundColor: counter.drawMode
-                                  ? theme.colorScheme.onPrimaryContainer
-                                  : theme.colorScheme.onSurface,
-                              child: Icon(
-                                counter.drawMode ? Icons.pan_tool : Icons.edit,
-                              ),
+                          ),
+                        if (hasImage)
+                          Positioned(
+                            right: 8,
+                            bottom: 8,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                if (counter.drawMode) ...[
+                                  FloatingActionButton.small(
+                                    onPressed: counter.isRunning
+                                        ? null
+                                        : counter.clearDrawings,
+                                    heroTag: 'clearDrawings',
+                                    tooltip: 'Clear drawings',
+                                    child: const Icon(Icons.delete_outline),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  FloatingActionButton.small(
+                                    onPressed: counter.isRunning
+                                        ? null
+                                        : counter.undoLastPath,
+                                    heroTag: 'undo',
+                                    tooltip: 'Undo last stroke',
+                                    child: const Icon(Icons.undo),
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+                                FloatingActionButton.small(
+                                  onPressed: counter.isRunning
+                                      ? null
+                                      : counter.toggleDrawMode,
+                                  heroTag: 'draw',
+                                  tooltip: counter.drawMode
+                                      ? 'Exit draw mode'
+                                      : 'Enter draw mode',
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                  foregroundColor: theme.colorScheme.onSurface,
+                                  child: Icon(
+                                    counter.drawMode ? Icons.close : Icons.edit,
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (counter.drawMode) ...[
-                              const SizedBox(height: 8),
-                              FloatingActionButton.small(
-                                onPressed: counter.isRunning ? null : counter.undoLastPath,
-                                heroTag: 'undo',
-                                tooltip: 'Undo last stroke',
-                                child: const Icon(Icons.undo),
-                              ),
-                              const SizedBox(height: 8),
-                              FloatingActionButton.small(
-                                onPressed: counter.isRunning ? null : counter.clearDrawings,
-                                heroTag: 'clearDrawings',
-                                tooltip: 'Clear drawings',
-                                child: const Icon(Icons.delete_outline),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
+                          ),
+                  ],
+                ),
             ),
           ),
 
@@ -264,7 +304,91 @@ class CounterScreen extends StatelessWidget {
 
     if (image == null || result == null) return;
 
-    // Ensure collections are loaded before showing the sheet
+    // If editing a saved session, ask user to choose between update or save as new
+    if (counter.isEditingSavedSession) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Save Options'),
+          content: const Text(
+            'Do you want to update the existing entry or save as a new entry?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, 'cancel'),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, 'new'),
+              child: const Text('Save as New'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, 'update'),
+              child: const Text('Update Existing'),
+            ),
+          ],
+        ),
+      );
+
+      if (choice == null || choice == 'cancel') return;
+
+      if (choice == 'update') {
+        // Update the existing session
+        final sessionId = counter.activeSessionId;
+        final collectionId = counter.activeCollectionId;
+        if (sessionId == null || collectionId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Missing session context for update.')),
+          );
+          return;
+        }
+
+        final updatedSession = CountSession(
+          id: sessionId,
+          collectionId: collectionId,
+          timestamp: DateTime.now(),
+          peopleCount: result.count,
+          correction: counter.activeCorrection,
+          imagePath: image.path,
+          confidenceThreshold: counter.confidenceThreshold,
+          iouThreshold: counter.iouThreshold,
+          notes: counter.activeNotes,
+          maskPaths: counter.drawnPaths.isNotEmpty ? counter.drawnPaths : null,
+        );
+
+        final updated = await collectionsProvider.updateSession(updatedSession);
+        if (!context.mounted) return;
+
+        if (updated) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Saved changes to existing image.'),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+          );
+          counter.clearResult();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(collectionsProvider.errorMessage ?? 'Save failed.'),
+            ),
+          );
+        }
+        return;
+      } else if (choice == 'new') {
+        // Clear edit context and proceed with creating a new entry
+        counter.clearActiveSessionContext();
+        // Continue below to create new session
+      }
+    }
+
+    // Create new session (either new image or user chose "Save as New" while editing)
+    // Ensure collections are loaded before showing the sheet for new saves.
     await collectionsProvider.loadCollections();
 
     if (!context.mounted) return;
@@ -296,6 +420,7 @@ class CounterScreen extends StatelessWidget {
       confidenceThreshold: counter.confidenceThreshold,
       iouThreshold: counter.iouThreshold,
       notes: request.notes,
+      maskPaths: counter.drawnPaths.isNotEmpty ? counter.drawnPaths : null,
     );
 
     if (!context.mounted) return;

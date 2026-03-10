@@ -1,3 +1,5 @@
+import '../widgets/drawing_overlay.dart';
+
 class CountSession {
   final int? id;
   final int collectionId;
@@ -8,6 +10,7 @@ class CountSession {
   final double confidenceThreshold;
   final double iouThreshold;
   final String? notes;
+  final List<DrawnPath>? maskPaths;
 
   const CountSession({
     this.id,
@@ -19,6 +22,7 @@ class CountSession {
     required this.confidenceThreshold,
     required this.iouThreshold,
     this.notes,
+    this.maskPaths,
   });
 
   int get correctedCount => peopleCount + correction;
@@ -34,6 +38,7 @@ class CountSession {
       'confidence_threshold': confidenceThreshold,
       'iou_threshold': iouThreshold,
       'notes': notes,
+      'mask_paths': maskPaths != null ? DrawnPath.encodeList(maskPaths!) : null,
     };
   }
 
@@ -48,6 +53,7 @@ class CountSession {
       confidenceThreshold: (map['confidence_threshold'] as num).toDouble(),
       iouThreshold: (map['iou_threshold'] as num).toDouble(),
       notes: map['notes'] as String?,
+      maskPaths: DrawnPath.decodeList(map['mask_paths'] as String?),
     );
   }
 }

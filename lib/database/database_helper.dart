@@ -55,6 +55,7 @@ class DatabaseHelper {
         confidence_threshold REAL NOT NULL,
         iou_threshold REAL NOT NULL,
         notes TEXT,
+        mask_paths TEXT,
         FOREIGN KEY (collection_id) REFERENCES $collectionsTable(id) ON DELETE CASCADE
       )
     ''');
@@ -96,6 +97,20 @@ class DatabaseHelper {
   Future<int> insertSession(CountSession session) async {
     final db = await database;
     return db.insert(sessionsTable, session.toMap()..remove('id'));
+  }
+
+  Future<void> updateSession(CountSession session) async {
+    final db = await database;
+    final sessionId = session.id;
+    if (sessionId == null) {
+      throw ArgumentError('Session id is required for update');
+    }
+    await db.update(
+      sessionsTable,
+      session.toMap()..remove('id'),
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
   }
 
   Future<List<CountSession>> getSessionsForCollection(int collectionId) async {

@@ -5,7 +5,6 @@ import 'package:image/image.dart' as img;
 
 import '../services/people_counter.dart';
 import '../services/settings_service.dart';
-import '../utils/coordinate_transformer.dart';
 import '../widgets/drawing_overlay.dart';
 
 class CounterProvider extends ChangeNotifier {
@@ -22,7 +21,10 @@ class CounterProvider extends ChangeNotifier {
   bool _pendingCounterNav = false;
   bool _drawMode = false;
   List<DrawnPath> _drawnPaths = [];
-  Size? _imageDisplaySize; // Size of the widget displaying the image
+  int? _activeSessionId;
+  int? _activeCollectionId;
+  int _activeCorrection = 0;
+  String? _activeNotes;
   int? _imageWidth; // Original image dimensions
   int? _imageHeight;
 
@@ -32,6 +34,13 @@ class CounterProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get drawMode => _drawMode;
   List<DrawnPath> get drawnPaths => _drawnPaths;
+  int? get activeSessionId => _activeSessionId;
+  int? get activeCollectionId => _activeCollectionId;
+  int get activeCorrection => _activeCorrection;
+  String? get activeNotes => _activeNotes;
+  bool get isEditingSavedSession => _activeSessionId != null;
+  int? get imageWidth => _imageWidth;
+  int? get imageHeight => _imageHeight;
 
   /// True when a history session was tapped and the app should navigate to the
   /// counter tab.  Consume with [consumeCounterNav] after switching.
@@ -39,11 +48,6 @@ class CounterProvider extends ChangeNotifier {
   void consumeCounterNav() => _pendingCounterNav = false;
   double get confidenceThreshold => _counter.confidenceThreshold;
   double get iouThreshold => _counter.iouThreshold;
-
-  /// Store the display size to transform drawing coordinates
-  void setImageDisplaySize(Size size) {
-    _imageDisplaySize = size;
-  }
 
   Future<void> initialize() async {
     final thresholds = await _settingsService.loadThresholds(
@@ -64,6 +68,7 @@ class CounterProvider extends ChangeNotifier {
     _errorMessage = null;
     _drawnPaths = [];
     _drawMode = false;
+    clearActiveSessionContext();
     
     // Load image dimensions
     await _loadImageDimensions();
@@ -80,19 +85,39 @@ class CounterProvider extends ChangeNotifier {
       if (decoded != null) {
         _imageWidth = decoded.width;
         _imageHeight = decoded.height;
+        notifyListeners();
       }
     } catch (e) {
       print('Failed to load image dimensions: $e');
     }
   }
 
-  void loadImageFromPath(String path) {
+  void loadImageFromPath(
+    String path, {
+    int? sessionId,
+    int? collectionId,
+    int? correction,
+    String? notes,
+    List<DrawnPath>? maskPaths,
+    double? confidenceThreshold,
+    double? iouThreshold,
+  }) {
     _selectedImage = File(path);
     _result = null;
     _errorMessage = null;
     _pendingCounterNav = true;
-    _drawnPaths = [];
+    _drawnPaths = maskPaths != null ? List.from(maskPaths) : [];
     _drawMode = false;
+    _activeSessionId = sessionId;
+    _activeCollectionId = collectionId;
+    _activeCorrection = correction ?? 0;
+    _activeNotes = notes;
+    if (confidenceThreshold != null) {
+      _counter.confidenceThreshold = confidenceThreshold;
+    }
+    if (iouThreshold != null) {
+      _counter.iouThreshold = iouThreshold;
+    }
     _loadImageDimensions();
     notifyListeners();
   }
@@ -103,6 +128,7 @@ class CounterProvider extends ChangeNotifier {
     _errorMessage = null;
     _drawnPaths = [];
     _drawMode = false;
+    clearActiveSessionContext();
     _imageWidth = null;
     _imageHeight = null;
     notifyListeners();
@@ -117,29 +143,10 @@ class CounterProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Transform drawing paths from widget coordinates to image coordinates
-      List<DrawnPath>? transformedPaths;
-      if (_drawnPaths.isNotEmpty && 
-          _imageDisplaySize != null && 
-          _imageWidth != null && 
-          _imageHeight != null) {
-        final transformer = CoordinateTransformer(
-          imageWidth: _imageWidth!.toDouble(),
-          imageHeight: _imageHeight!.toDouble(),
-          widgetWidth: _imageDisplaySize!.width,
-          widgetHeight: _imageDisplaySize!.height,
-        );
-
-        transformedPaths = _drawnPaths.map((path) {
-          return DrawnPath(
-            points: path.points.map(transformer.widgetToImage).toList(),
-            color: path.color,
-            strokeWidth: path.strokeWidth / transformer.scale,
-          );
-        }).toList();
-      }
-
-      _result = await _counter.detectFromFile(image, maskPaths: transformedPaths);
+      _result = await _counter.detectFromFile(
+        image,
+        maskPaths: _drawnPaths.isNotEmpty ? _drawnPaths : null,
+      );
     } catch (e) {
       _errorMessage = 'Inference failed: $e';
     } finally {
@@ -171,8 +178,16 @@ class CounterProvider extends ChangeNotifier {
     _errorMessage = null;
     _drawnPaths = [];
     _drawMode = false;
+    clearActiveSessionContext();
     _loadImageDimensions();
     notifyListeners();
+  }
+
+  void clearActiveSessionContext() {
+    _activeSessionId = null;
+    _activeCollectionId = null;
+    _activeCorrection = 0;
+    _activeNotes = null;
   }
 
   void toggleDrawMode() {
