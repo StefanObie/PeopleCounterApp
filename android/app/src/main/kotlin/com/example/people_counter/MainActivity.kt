@@ -1,4 +1,4 @@
-package com.example.people_counter
+package com.people.counter
 
 import io.flutter.embedding.android.FlutterActivity
 
