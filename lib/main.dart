@@ -26,6 +26,65 @@ class MyApp extends StatelessWidget {
 
   final PeopleCounter peopleCounter;
 
+  ThemeData _buildTheme() {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF2F6FB3),
+      brightness: Brightness.light,
+    );
+    const chromeColor = Color(0xFF9FC2E8);
+    const chromeForeground = Color(0xFF0E2A47);
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: colorScheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: chromeColor,
+        foregroundColor: chromeForeground,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: chromeColor,
+        indicatorColor: colorScheme.primaryContainer.withValues(alpha: 0.96),
+        surfaceTintColor: Colors.transparent,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final color = states.contains(WidgetState.selected)
+              ? colorScheme.primary
+              : chromeForeground.withValues(alpha: 0.82);
+          return TextStyle(color: color, fontWeight: FontWeight.w600);
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final color = states.contains(WidgetState.selected)
+              ? colorScheme.primary
+              : chromeForeground.withValues(alpha: 0.82);
+          return IconThemeData(color: color);
+        }),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        showDragHandle: true,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: colorScheme.inverseSurface,
+        contentTextStyle: TextStyle(color: colorScheme.onInverseSurface),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: colorScheme.primary,
+        inactiveTrackColor: colorScheme.surfaceContainerHighest,
+        thumbColor: colorScheme.primary,
+        overlayColor: colorScheme.primary.withValues(alpha: 0.12),
+        valueIndicatorColor: colorScheme.inverseSurface,
+        valueIndicatorTextStyle: TextStyle(
+          color: colorScheme.onInverseSurface,
+        ),
+      ),
+      dividerColor: colorScheme.outlineVariant,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -40,10 +99,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'People Counter',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-          useMaterial3: true,
-        ),
+        theme: _buildTheme(),
         home: const HomeShell(),
       ),
     );

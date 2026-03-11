@@ -45,10 +45,10 @@ class _CollectionDetailScreenState extends State<CollectionDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
+              color: const Color(0xFFD8E7F8),
               border: Border(
                 bottom: BorderSide(
-                  color: theme.colorScheme.outlineVariant,
+                  color: const Color(0xFFB4CCE7),
                   width: 1,
                 ),
               ),
@@ -64,7 +64,7 @@ class _CollectionDetailScreenState extends State<CollectionDetailScreen> {
                 Container(
                   width: 1,
                   height: 50,
-                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  color: const Color(0xFF7EA6D0).withValues(alpha: 0.45),
                 ),
                 _SummaryItem(
                   icon: Icons.people,
@@ -348,15 +348,15 @@ class _SummaryItem extends StatelessWidget {
               size: emphasized ? 24 : 20,
               color: emphasized
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.onPrimaryContainer,
+                  : const Color(0xFF234A72),
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: theme.textTheme.labelMedium?.copyWith(
                 color: emphasized
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                    ? const Color(0xFF17385C)
+                    : const Color(0xFF234A72).withValues(alpha: 0.88),
               ),
             ),
           ],
@@ -368,7 +368,7 @@ class _SummaryItem extends StatelessWidget {
             fontWeight: FontWeight.bold,
             color: emphasized
                 ? theme.colorScheme.primary
-                : theme.colorScheme.onPrimaryContainer,
+                : const Color(0xFF17385C),
           ),
         ),
       ],
